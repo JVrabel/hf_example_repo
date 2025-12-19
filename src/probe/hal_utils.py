@@ -127,27 +127,44 @@ def extract_features(
     pos_mode: str = "last",
     pos_idx: Optional[int] = None,
     pool: str = "none",
+    batch_size: int = 8,  # Small batch for long formatted prompts
 ) -> np.ndarray:
     """
     Extract hidden-state features from a given layer for a list of texts.
+    Processes texts in batches to avoid OOM errors.
     """
     if subject.tokenizer.pad_token is None:
         subject.tokenizer.pad_token = subject.tokenizer.eos_token
 
     config = ActivationConfig(layers=[layer_idx], return_numpy=True)
-    acts = activation_grabber.get_activations(texts, config=config)
+    
+    all_feats = []
+    n_batches = (len(texts) + batch_size - 1) // batch_size
+    
+    for batch_idx in range(n_batches):
+        start = batch_idx * batch_size
+        end = min(start + batch_size, len(texts))
+        batch_texts = texts[start:end]
+        
+        with torch.no_grad():
+            acts = activation_grabber.get_activations(batch_texts, config=config)
+            hs_BLTI = acts.activations
+            attn = acts.attention_mask
 
-    hs_BLTI = acts.activations
-    attn = acts.attention_mask
+            for b in range(len(batch_texts)):
+                pos = _select_token_position(attn[b], pos_mode, pos_idx)
+                token_vec = hs_BLTI[b, 0:1, pos : pos + 1, :]
+                pooled = _pool_tokens(token_vec, pool, attn[b])
+                all_feats.append(pooled.reshape(-1))
+        
+        # Clear GPU cache after each batch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        if (batch_idx + 1) % 100 == 0 or batch_idx == n_batches - 1:
+            print(f"  Extracted features: {len(all_feats)}/{len(texts)}")
 
-    feats = []
-    for b in range(len(texts)):
-        pos = _select_token_position(attn[b], pos_mode, pos_idx)
-        token_vec = hs_BLTI[b, 0:1, pos : pos + 1, :]
-        pooled = _pool_tokens(token_vec, pool, attn[b])
-        feats.append(pooled.reshape(-1))
-
-    return np.stack(feats, axis=0)
+    return np.stack(all_feats, axis=0)
 
 
 # ---------------------------------------------------------------------------
