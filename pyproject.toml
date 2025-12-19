@@ -13,6 +13,8 @@ dependencies = [
     "nnsight~=0.3.3",
     "numpy",
     "pydantic",
+    "scikit-learn",
+    "accelerate",
 ]
 
 [project.optional-dependencies]

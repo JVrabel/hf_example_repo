@@ -828,6 +828,11 @@ llama31_70B_instruct_config = Llama3Config(
     is_chat_model=True,
 )
 
+llama2_7B_instruct_config = Llama3Config(
+    hf_model_id="meta-llama/Llama-2-7b-chat-hf",
+    is_chat_model=True,
+)
+
 
 def get_subject_config(hf_model_id: str):
     if hf_model_id == "meta-llama/Meta-Llama-3-8B":
@@ -838,6 +843,8 @@ def get_subject_config(hf_model_id: str):
         return llama31_8B_instruct_config
     elif hf_model_id == "meta-llama/Meta-Llama-3.1-70B-Instruct":
         return llama31_70B_instruct_config
+    elif hf_model_id == "meta-llama/Llama-2-7b-chat-hf":
+        return llama2_7B_instruct_config
     elif hf_model_id == "gpt2":
         return gpt2_config
     else:
